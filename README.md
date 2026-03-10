@@ -2,8 +2,6 @@
 
 OpenClaw / MoltBot 的管理脚本，把常用操作都包进了一个交互式菜单里，省得每次手打命令。
 
-支持 macOS（Intel / Apple Silicon）和主流 Linux 发行版。
-
 作者：Joey  
 YouTube：[@joeyblog](https://youtube.com/@joeyblog)  
 Telegram 交流群：https://t.me/+ft-zI76oovgwNmRh  
@@ -24,26 +22,12 @@ Telegram 交流群：https://t.me/+ft-zI76oovgwNmRh
 
 ---
 
-## 系统要求
-
-| 系统 | 支持情况 |
-|------|---------|
-| macOS（Apple Silicon M 系列） | 完整支持，依赖通过 Homebrew 安装 |
-| macOS（Intel） | 完整支持，依赖通过 Homebrew 安装 |
-| Ubuntu / Debian | 完整支持 |
-| CentOS / Rocky / RHEL | 完整支持 |
-| Alpine | 支持 |
-| Arch Linux | 支持 |
-
----
-
 ## 依赖
 
 脚本会在首次运行时自动安装 gum 和 fzf，其他依赖：
 
-- Node.js 和 npm（macOS 用 `brew install node`，Linux 走 nodesource）
+- Node.js 和 npm
 - curl、git、nano
-- macOS 需要提前安装 [Homebrew](https://brew.sh)
 
 ---
 
@@ -103,7 +87,7 @@ Qwen 用的是 device flow，只需要在浏览器里输入授权码，更简单
 
 | 操作 | 说明 |
 |------|------|
-| 启动 / 停止 / 重启 | Linux 优先 systemd，macOS / 无 systemd 环境用 nohup |
+| 启动 / 停止 / 重启 | 优先 systemd，失败了用 nohup |
 | 查看日志 | journalctl 或者 /tmp/cliproxyapi.log |
 | 账号授权登录 | 五个提供商都支持 |
 | 生成并添加 API Key | 生成 sk- 格式的 key，自动写入 config.yaml |
