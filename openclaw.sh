@@ -1,4 +1,18 @@
 #!/usr/bin/env bash
+#
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║              OpenClaw / MoltBot 管理脚本                        ║
+# ╠══════════════════════════════════════════════════════════════════╣
+# ║  作者     GitHub  : by Joey                                     ║
+# ║           YouTube : @joeyblog                                   ║
+# ║           Telegram: https://t.me/+ft-zI76oovgwNmRh             ║
+# ╠══════════════════════════════════════════════════════════════════╣
+# ║  致谢 / 引用                                                    ║
+# ║  · 原始脚本基础来自 kejilion（@kejilion）                       ║
+# ║  · CLIProxyAPI 安装器来自 cliproxyapi-installer                 ║
+# ║    github.com/brokechubb/cliproxyapi-installer                  ║
+# ╚══════════════════════════════════════════════════════════════════╝
+#
 : "${gl_hui:='\e[37m'}"
 : "${gl_hong:='\033[31m'}"
 : "${gl_lv:='\033[32m'}"
@@ -7,6 +21,7 @@
 : "${gl_bai:='\033[0m'}"
 : "${gl_zi:='\033[35m'}"
 : "${gl_kjlan:='\033[96m'}"
+
 if ! declare -f break_end > /dev/null 2>&1; then
 break_end() {
 	if command -v gum >/dev/null 2>&1; then
@@ -21,6 +36,7 @@ break_end() {
 	clear
 }
 fi
+
 if ! declare -f install > /dev/null 2>&1; then
 install() {
 	if [[ $# -eq 0 ]]; then
@@ -30,9 +46,7 @@ install() {
 	for package in "$@"; do
 		if ! command -v "$package" &>/dev/null; then
 			echo -e "${gl_kjlan}正在安装 $package...${gl_bai}"
-			if command -v brew &>/dev/null; then
-				brew install "$package"
-			elif command -v dnf &>/dev/null; then
+			if command -v dnf &>/dev/null; then
 				dnf -y update
 				dnf install -y epel-release
 				dnf install -y "$package"
@@ -66,31 +80,20 @@ install() {
 	done
 }
 fi
-_sed_i() {
-	if [[ "$(uname -s)" == "Darwin" ]]; then
-		sed -i '' "$@"
-	else
-		sed -i "$@"
-	fi
-}
+
 _install_gum_binary() {
-	local os arch
-	case "$(uname -s)" in
-		Darwin) os="darwin" ;;
-		Linux)  os="linux"  ;;
-		*) echo "不支持的操作系统: $(uname -s)"; return 1 ;;
-	esac
+	local arch
 	case "$(uname -m)" in
-		x86_64)          arch="amd64" ;;
-		arm64 | aarch64) arch="arm64" ;;
-		armv7l)          arch="armv7" ;;
+		x86_64)  arch="amd64" ;;
+		aarch64) arch="arm64" ;;
+		armv7l)  arch="armv7" ;;
 		*) echo "不支持的架构: $(uname -m)"; return 1 ;;
 	esac
 	local latest
 	latest=$(curl -fsSL https://api.github.com/repos/charmbracelet/gum/releases/latest \
 		| grep '"tag_name"' | sed 's/.*"v\([^"]*\)".*/\1/')
 	[[ -z "$latest" ]] && { echo "获取 gum 版本失败"; return 1; }
-	local url="https://github.com/charmbracelet/gum/releases/download/v${latest}/gum_${latest}_${os}_${arch}.tar.gz"
+	local url="https://github.com/charmbracelet/gum/releases/download/v${latest}/gum_${latest}_linux_${arch}.tar.gz"
 	local tmp
 	tmp=$(mktemp -d)
 	curl -fsSL "$url" -o "$tmp/gum.tar.gz" \
@@ -99,12 +102,14 @@ _install_gum_binary() {
 	rm -rf "$tmp"
 	command -v gum >/dev/null 2>&1
 }
+
 install_gum() {
 	command -v gum >/dev/null 2>&1 && return 0
 	echo "正在安装 gum..."
 	if command -v brew >/dev/null 2>&1; then
 		brew install gum
 	elif command -v apt >/dev/null 2>&1; then
+		# 确保 gpg 可用
 		command -v gpg >/dev/null 2>&1 || apt install -y gnupg 2>/dev/null
 		mkdir -p /etc/apt/keyrings
 		if curl -fsSL https://repo.charm.sh/apt/gpg.key \
@@ -113,6 +118,7 @@ install_gum() {
 				| tee /etc/apt/sources.list.d/charm.list >/dev/null
 			apt update -y 2>/dev/null && apt install -y gum 2>/dev/null
 		fi
+		# apt repo 失败时直接下载二进制
 		command -v gum >/dev/null 2>&1 || _install_gum_binary
 	elif command -v dnf &>/dev/null; then
 		cat > /etc/yum.repos.d/charm.repo <<'REPO'
@@ -123,7 +129,7 @@ enabled=1
 gpgcheck=1
 gpgkey=https://repo.charm.sh/yum/gpg.key
 REPO
-		dnf install -y gum 2>/dev/null || _install_gum_binary
+		dnf install -y gum
 	elif command -v yum &>/dev/null; then
 		cat > /etc/yum.repos.d/charm.repo <<'REPO'
 [charm]
@@ -133,7 +139,7 @@ enabled=1
 gpgcheck=1
 gpgkey=https://repo.charm.sh/yum/gpg.key
 REPO
-		yum install -y gum 2>/dev/null || _install_gum_binary
+		yum install -y gum
 	elif command -v apk &>/dev/null; then
 		apk add gum 2>/dev/null || _install_gum_binary
 	elif command -v pacman &>/dev/null; then
@@ -145,6 +151,7 @@ REPO
 	fi
 	command -v gum >/dev/null 2>&1 || { echo "gum 安装失败，请手动安装: https://github.com/charmbracelet/gum"; return 1; }
 }
+
 install_fzf() {
 	command -v fzf >/dev/null 2>&1 && return 0
 	echo "正在安装 fzf..."
@@ -167,54 +174,45 @@ install_fzf() {
 		return 1
 	fi
 }
+
 _install_shortcut() {
-	local shortcut_dir shortcut
-	local sys_bin=""
-	for d in /opt/homebrew/bin /usr/local/bin; do
-		[[ -d "$d" && -w "$d" ]] && { sys_bin="$d"; break; }
-	done
-	if [[ -n "$sys_bin" ]]; then
-		shortcut_dir="$sys_bin"
+	local store_dir shortcut_dir shortcut
+
+	store_dir="$HOME/.local/bin"
+	mkdir -p "$store_dir"
+
+	if [[ -w /usr/local/bin ]]; then
+		shortcut_dir="/usr/local/bin"
 	else
-		shortcut_dir="$HOME/.local/bin"
-		mkdir -p "$shortcut_dir"
+		shortcut_dir="$store_dir"
 		local rc_file=""
-		if [[ "$(uname -s)" == "Darwin" ]]; then
-			[[ -f "$HOME/.zprofile" ]] && rc_file="$HOME/.zprofile"
-			[[ -z "$rc_file" && -f "$HOME/.zshrc" ]] && rc_file="$HOME/.zshrc"
-		else
-			[[ -f "$HOME/.zshrc" ]]  && rc_file="$HOME/.zshrc"
-			[[ -z "$rc_file" && -f "$HOME/.bashrc" ]] && rc_file="$HOME/.bashrc"
+		[[ -f "$HOME/.zshrc" ]]  && rc_file="$HOME/.zshrc"
+		[[ -f "$HOME/.bashrc" ]] && rc_file="${rc_file:-$HOME/.bashrc}"
+		if [[ -n "$rc_file" ]] && ! grep -q "$store_dir" "$rc_file" 2>/dev/null; then
+			printf '\nexport PATH="%s:$PATH"\n' "$store_dir" >> "$rc_file"
 		fi
-		if [[ -n "$rc_file" ]] && ! grep -q '\.local/bin' "$rc_file" 2>/dev/null; then
-			printf '\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$rc_file"
-		fi
-		export PATH="$HOME/.local/bin:$PATH"
+		export PATH="$store_dir:$PATH"
 	fi
+
 	shortcut="$shortcut_dir/oc"
-	cat > "$shortcut" <<'OCSCRIPT'
+
+	cat > "$shortcut" <<EOF
 #!/usr/bin/env bash
-_dir="$HOME/.local/bin"
-mkdir -p "$_dir"
-if curl -fsSL https://raw.githubusercontent.com/byJoey/openclawctl/main/openclaw.sh \
-    -o "$_dir/openclawctl.sh" 2>/dev/null; then
-    chmod +x "$_dir/openclawctl.sh"
-fi
-if [[ -x "$_dir/openclawctl.sh" ]]; then
-    exec bash "$_dir/openclawctl.sh" "$@"
-else
-    echo "oc: 脚本不存在或下载失败，请检查网络"
-    exit 1
-fi
-OCSCRIPT
+curl -fsSL https://raw.githubusercontent.com/byJoey/openclawctl/main/openclaw.sh \\
+    -o "$store_dir/openclawctl.sh" 2>/dev/null && chmod +x "$store_dir/openclawctl.sh"
+exec bash "$store_dir/openclawctl.sh" "\$@"
+EOF
 	chmod +x "$shortcut"
-	hash -r 2>/dev/null || true
 }
+
 moltbot_menu() {
 	local app_id="114"
+
 	_install_shortcut
+
 	install_gum || { echo "gum 安装失败，无法继续"; return 1; }
 	install_fzf || { echo "fzf 安装失败，无法继续"; return 1; }
+
 	ui_header() {
 		gum style \
 			--bold --foreground 51 \
@@ -227,22 +225,29 @@ moltbot_menu() {
 	ui_warn() { gum style --foreground 208 "  ⚡  $*"; }
 	ui_info() { gum style --foreground 51  "  ◈  $*"; }
 	ui_step() { echo; gum style --bold --foreground 201 "  ▶  $*"; echo; }
+
 	check_openclaw_update() {
 		if ! command -v npm >/dev/null 2>&1; then
 			return 1
 		fi
+
 		local local_version remote_version
 		local_version=$(npm list -g openclaw --depth=0 --no-update-notifier 2>/dev/null \
 			| grep openclaw | awk '{print $NF}' | sed 's/^.*@//')
+
 		[[ -z "$local_version" ]] && return 1
+
 		remote_version=$(npm view openclaw version --no-update-notifier 2>/dev/null)
+
 		[[ -z "$remote_version" ]] && return 1
+
 		if [[ "$local_version" != "$remote_version" ]]; then
 			echo -e "\033[38;5;208m⚡ UPDATE AVAILABLE  $remote_version\033[0m"
 		else
 			echo -e "\033[90m✦ v$local_version\033[0m"
 		fi
 	}
+
 	get_install_status() {
 		if command -v openclaw >/dev/null 2>&1; then
 			echo -e "\033[38;5;46m◉ INSTALLED\033[0m"
@@ -250,6 +255,7 @@ moltbot_menu() {
 			echo -e "\033[90m○ NOT FOUND\033[0m"
 		fi
 	}
+
 	get_running_status() {
 		if pgrep -f "openclaw-gatewa" >/dev/null 2>&1; then
 			echo -e "\033[38;5;46m▶ RUNNING\033[0m"
@@ -257,28 +263,33 @@ moltbot_menu() {
 			echo -e "\033[90m■ STOPPED\033[0m"
 		fi
 	}
+
 	start_gateway() {
 		openclaw gateway stop >/dev/null 2>&1
 		gum spin --spinner pulse --title "正在启动网关..." -- openclaw gateway start
 		sleep 1
 	}
+
 	install_node_and_tools() {
-		if command -v brew &>/dev/null; then
-			brew install node 2>/dev/null || true
-		elif command -v dnf &>/dev/null; then
+		if command -v dnf &>/dev/null; then
 			curl -fsSL https://rpm.nodesource.com/setup_24.x | sudo bash -
 			dnf update -y
 			dnf group install -y "Development Tools" "Development Libraries"
 			dnf install -y cmake libatomic nodejs
-		elif command -v apt &>/dev/null; then
+		fi
+
+		if command -v apt &>/dev/null; then
 			curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
 			apt update -y
 			apt install build-essential python3 libatomic1 nodejs -y
 		fi
 	}
+
 	configure_openclaw_session_policy() {
 		local config_file="${HOME}/.openclaw/openclaw.json"
+
 		[[ ! -f "$config_file" ]] && return 1
+
 		python3 - "$config_file" <<'PY'
 import json, sys
 path = sys.argv[1]
@@ -303,10 +314,14 @@ with open(path, 'w', encoding='utf-8') as f:
     f.write('\n')
 PY
 	}
+
 	sync_openclaw_api_models() {
 		local config_file="${HOME}/.openclaw/openclaw.json"
+
 		[[ ! -f "$config_file" ]] && return 0
+
 		install jq curl >/dev/null 2>&1
+
 		python3 - "$config_file" <<'PY'
 import copy
 import json
@@ -343,8 +358,10 @@ changed = False
 fatal_errors = []
 summary = []
 
+
 def model_ref(provider_name, model_id):
     return f"{provider_name}/{model_id}"
+
 
 def get_primary_ref(defaults_obj):
     model_obj = defaults_obj.get('model')
@@ -356,6 +373,7 @@ def get_primary_ref(defaults_obj):
             return primary
     return None
 
+
 def set_primary_ref(defaults_obj, new_ref):
     model_obj = defaults_obj.get('model')
     if isinstance(model_obj, str):
@@ -365,10 +383,12 @@ def set_primary_ref(defaults_obj, new_ref):
     else:
         defaults_obj['model'] = {'primary': new_ref}
 
+
 def ref_provider(ref):
     if not isinstance(ref, str) or '/' not in ref:
         return None
     return ref.split('/', 1)[0]
+
 
 def collect_available_refs(exclude_provider=None):
     refs = []
@@ -384,6 +404,7 @@ def collect_available_refs(exclude_provider=None):
                 refs.append(model_ref(pname, str(m['id'])))
     return refs
 
+
 def prompt_delete_provider(name):
     prompt = f"{name} /models 探测连续失败 3 次。是否删除该 API 供应商及其全部相关模型？[y/N]: "
     try:
@@ -391,6 +412,7 @@ def prompt_delete_provider(name):
     except EOFError:
         return False
     return ans in ('y', 'yes')
+
 
 def rebind_defaults_before_delete(name):
     global changed
@@ -427,6 +449,7 @@ def rebind_defaults_before_delete(name):
 
     return True
 
+
 def delete_provider_and_refs(name):
     global changed
 
@@ -445,6 +468,7 @@ def delete_provider_and_refs(name):
 
     summary.append(f'已删除 provider {name}，并移除 defaults.models 下 {len(removed_refs)} 个模型引用')
     return True
+
 
 def fetch_remote_models_with_retry(name, base_url, api_key, retries=3):
     last_error = None
@@ -466,6 +490,7 @@ def fetch_remote_models_with_retry(name, base_url, api_key, retries=3):
             if attempt < retries:
                 time.sleep(1)
     return None, last_error, retries
+
 
 for name, provider in list(providers.items()):
     if not isinstance(provider, dict):
@@ -597,88 +622,48 @@ else:
     print('无需同步：配置已与上游 /models 保持一致')
 PY
 	}
+
 	_install_openclaw_core() {
 		install_node_and_tools
-		git config --global url."https://github.com/".insteadOf ssh://git@github.com/
-		git config --global url."https://github.com/".insteadOf git@github.com:
+
+		git config --global url."${gh_https_url}github.com/".insteadOf ssh://git@github.com/
+		git config --global url."${gh_https_url}github.com/".insteadOf git@github.com:
+
 		gum spin --spinner globe --title "正在安装 OpenClaw..." -- npm install -g openclaw@latest
 		openclaw onboard --install-daemon
-		_sed_i 's|"profile": "messaging"|"profile": "full"|g' ~/.openclaw/openclaw.json
+		sed -i 's|"profile": "messaging"|"profile": "full"|g' ~/.openclaw/openclaw.json
 		configure_openclaw_session_policy
 		start_gateway
 		add_app_id
 	}
+
 	install_moltbot() {
 		_install_openclaw_core
 		break_end
 	}
-	_cliproxy_is_brew() {
-		[[ "$(uname -s)" == "Darwin" ]] && command -v brew >/dev/null 2>&1
-	}
-	_cliproxy_bin() {
-		local b
-		for b in cli-proxy-api cliproxyapi; do
-			if command -v "$b" >/dev/null 2>&1; then
-				echo "$b"; return 0
-			fi
-		done
-		if [[ "$(uname -s)" == "Darwin" ]]; then
-			local prefix
-			prefix="$(brew --prefix 2>/dev/null)"
-			for b in cli-proxy-api cliproxyapi; do
-				[[ -x "$prefix/bin/$b" ]] && { echo "$prefix/bin/$b"; return 0; }
-			done
-			return 1
-		fi
-		local f="$HOME/cliproxyapi/cli-proxy-api"
-		if [[ -x "$f" ]] && file "$f" 2>/dev/null | grep -qv "Mach-O"; then
-			echo "$f"; return 0
-		fi
-		[[ -x "$f" ]] && echo "$f"
-	}
-	_cliproxy_config_file() {
-		local candidates=(
-			"$HOME/cliproxyapi/config.yaml"
-			"$HOME/.config/cliproxyapi/config.yaml"
-			"$(brew --prefix 2>/dev/null)/etc/cliproxyapi/config.yaml"
-		)
-		for f in "${candidates[@]}"; do
-			[[ -f "$f" ]] && echo "$f" && return
-		done
-		echo "$HOME/cliproxyapi/config.yaml"
-	}
+
 	_cliproxy_start_service() {
-		if _cliproxy_is_brew; then
-			gum spin --spinner pulse --title "正在启动 CLIProxyAPI..." -- \
-				bash -c "brew services start cliproxyapi 2>/dev/null; sleep 3"
-		else
-			systemctl --user enable cliproxyapi.service >/dev/null 2>&1 || true
-			gum spin --spinner pulse --title "正在启动 CLIProxyAPI..." -- \
-				bash -c "systemctl --user start cliproxyapi.service 2>/dev/null; sleep 3"
-			if ! pgrep -f "cli-proxy-api" >/dev/null 2>&1; then
-				ui_warn "systemd 启动失败，改用后台直接运行..."
-				local bin; bin="$(_cliproxy_bin)"
-				[[ -n "$bin" ]] && (nohup "$bin" > /tmp/cliproxyapi.log 2>&1 &)
-				sleep 3
-			fi
+		systemctl --user enable cliproxyapi.service >/dev/null 2>&1 || true
+		gum spin --spinner pulse --title "正在启动 CLIProxyAPI..." -- \
+			bash -c "systemctl --user start cliproxyapi.service 2>/dev/null; sleep 3"
+		if ! pgrep -f "cli-proxy-api" >/dev/null 2>&1; then
+			ui_warn "systemd 启动失败，改用后台直接运行..."
+			(cd "$HOME/cliproxyapi" && nohup ./cli-proxy-api > /tmp/cliproxyapi.log 2>&1 &)
+			sleep 3
 		fi
 		if pgrep -f "cli-proxy-api" >/dev/null 2>&1; then
 			ui_ok "CLIProxyAPI 已启动"
 			return 0
 		else
-			ui_err "CLIProxyAPI 启动失败，请检查配置后手动启动"
+			ui_err "CLIProxyAPI 启动失败，请检查 $HOME/cliproxyapi/config.yaml 后手动启动"
 			return 1
 		fi
 	}
+
 	_cliproxy_stop_service() {
-		if _cliproxy_is_brew; then
+		if systemctl --user is-active --quiet cliproxyapi.service 2>/dev/null; then
 			gum spin --spinner pulse --title "正在停止 CLIProxyAPI..." -- \
-				bash -c "brew services stop cliproxyapi 2>/dev/null; sleep 2"
-		else
-			if systemctl --user is-active --quiet cliproxyapi.service 2>/dev/null; then
-				gum spin --spinner pulse --title "正在停止 CLIProxyAPI..." -- \
-					bash -c "systemctl --user stop cliproxyapi.service 2>/dev/null; sleep 2"
-			fi
+				bash -c "systemctl --user stop cliproxyapi.service 2>/dev/null; sleep 2"
 		fi
 		local pids
 		pids=$(pgrep -f "cli-proxy-api" 2>/dev/null || true)
@@ -694,13 +679,14 @@ PY
 			ui_err "停止失败，仍有进程残留"
 		fi
 	}
+
 	_cliproxy_oauth_login() {
-		local cliproxy_bin
-		cliproxy_bin="$(_cliproxy_bin)"
-		if [[ -z "$cliproxy_bin" ]]; then
-			ui_err "CLIProxyAPI 未安装或不可执行，请先安装"
+		local cliproxy_dir="$HOME/cliproxyapi"
+		if [[ ! -x "$cliproxy_dir/cli-proxy-api" ]]; then
+			ui_err "CLIProxyAPI 未安装或不可执行：$cliproxy_dir/cli-proxy-api"
 			return 1
 		fi
+
 		local provider_choice
 		provider_choice=$(gum choose --cursor "❯ " \
 			--header $'  选择要登录的 AI 提供商\n  ↑↓ 移动 · Enter 确认 · q 取消' \
@@ -710,6 +696,7 @@ PY
 			"Qwen (通义千问)" \
 			"iFlow" \
 			"取消") || return 0
+
 		local login_cmd="" login_port=""
 		case "$provider_choice" in
 			"Claude (Anthropic)")  login_cmd="--claude-login"; login_port="54545" ;;
@@ -719,6 +706,7 @@ PY
 			"iFlow")               login_cmd="--iflow-login";  login_port="11451" ;;
 			"取消"|*)              return 0 ;;
 		esac
+
 		echo
 		if [[ -n "$login_port" ]]; then
 			gum style \
@@ -735,9 +723,11 @@ PY
 			gum style --foreground 208 \
 				"  ⚡ 无需端口转发 — 回调 URL 里已含 code，直接转发给本机处理"
 			echo
-			"$cliproxy_bin" "$login_cmd" --no-browser &
+
+			(cd "$cliproxy_dir" && ./cli-proxy-api "$login_cmd" --no-browser) &
 			local cli_pid=$!
 			sleep 2
+
 			echo
 			local callback_url
 			callback_url=$(gum input \
@@ -745,6 +735,7 @@ PY
 				--prompt "  ❯ " \
 				--width 120 \
 				--char-limit 2000) || true
+
 			if [[ -n "$callback_url" ]]; then
 				ui_info "正在向本机发送回调..."
 				curl -sf "$callback_url" > /dev/null 2>&1 || true
@@ -756,21 +747,19 @@ PY
 			echo
 			gum style --foreground 240 "将打印授权码 + URL，在任意浏览器中打开并输入授权码即可"
 			echo
-			"$cliproxy_bin" "$login_cmd" --no-browser
+			(cd "$cliproxy_dir" && ./cli-proxy-api "$login_cmd" --no-browser)
 		fi
 	}
+
 	cliproxyapi_manage_menu() {
 		local cliproxy_dir="$HOME/cliproxyapi"
-		local config_file; config_file="$(_cliproxy_config_file)"
+		local config_file="$cliproxy_dir/config.yaml"
+
 		while true; do
 			clear
+
 			local cp_installed cp_running cp_version cp_port cp_keys
-			if _cliproxy_is_brew; then
-				cp_version=$(brew list --versions cliproxyapi 2>/dev/null | awk '{print $2}')
-				[[ -n "$cp_version" ]] \
-					&& cp_installed="\033[38;5;46m◉ INSTALLED (brew) v${cp_version}\033[0m" \
-					|| cp_installed="\033[90m○ NOT INSTALLED\033[0m"
-			elif [[ -f "$cliproxy_dir/version.txt" ]]; then
+			if [[ -f "$cliproxy_dir/version.txt" ]]; then
 				cp_version=$(cat "$cliproxy_dir/version.txt" 2>/dev/null || echo "?")
 				cp_installed="\033[38;5;46m◉ INSTALLED  v${cp_version}\033[0m"
 			else
@@ -786,6 +775,7 @@ PY
 			cp_port="${cp_port:-8080}"
 			cp_keys=$(awk '/^api-keys:/{f=1;next} f&&/^[^ \t]/{exit} f&&/"sk-/{n++} END{print n+0}' \
 				"$config_file" 2>/dev/null)
+
 			gum style \
 				--bold --foreground 51 \
 				--border double --border-foreground 51 \
@@ -796,6 +786,7 @@ PY
 			echo -e "  $cp_installed    $cp_running"
 			echo -e "  \033[90m端口 :${cp_port}    API Keys: ${cp_keys}\033[0m"
 			echo
+
 			local choice
 			choice=$(gum choose --cursor "❯ " \
 			--header $'  ─── CLIProxyAPI ───\n  ↑↓ 移动 · Enter 确认 · / 搜索 · q 退出' \
@@ -810,6 +801,7 @@ PY
 				"更新" \
 				"卸载" \
 				"退出") || break
+
 			case "$choice" in
 				"启动")
 					_cliproxy_start_service
@@ -825,21 +817,17 @@ PY
 					_cliproxy_start_service
 					break_end
 					;;
-			"查看日志")
-				echo
-				if _cliproxy_is_brew; then
-					brew services log cliproxyapi 2>/dev/null \
-						|| tail -80 "$(brew --prefix 2>/dev/null)/var/log/cliproxyapi.log" 2>/dev/null \
-						|| ui_warn "未找到 brew 日志"
-				elif systemctl --user is-active --quiet cliproxyapi.service 2>/dev/null; then
-					journalctl --user -u cliproxyapi.service --no-pager -n 80
-				elif [[ -f /tmp/cliproxyapi.log ]]; then
-					tail -80 /tmp/cliproxyapi.log
-				else
-					ui_warn "未找到日志（服务尚未运行过）"
-				fi
-				break_end
-				;;
+				"查看日志")
+					echo
+					if systemctl --user is-active --quiet cliproxyapi.service 2>/dev/null; then
+						journalctl --user -u cliproxyapi.service --no-pager -n 80
+					elif [[ -f /tmp/cliproxyapi.log ]]; then
+						tail -80 /tmp/cliproxyapi.log
+					else
+						ui_warn "未找到日志（服务尚未运行过）"
+					fi
+					break_end
+					;;
 				"账号授权登录")
 					_cliproxy_oauth_login
 					break_end
@@ -850,8 +838,8 @@ PY
 						break_end
 						continue
 					fi
-				local new_key
-				new_key="sk-$(python3 -c "import secrets,string; print(''.join(secrets.choice(string.ascii_letters+string.digits) for _ in range(48)))")"
+					local new_key
+					new_key="sk-$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 48)"
 					echo
 					gum style --bold --foreground 46 "  ◉  已生成新 API Key："
 					gum style --bold --foreground 51 "     $new_key"
@@ -890,40 +878,33 @@ PY
 						break_end
 					fi
 					;;
-			"更新")
-				echo
-				if gum confirm "  确认更新 CLIProxyAPI 到最新版本？"; then
-					if _cliproxy_is_brew; then
-						brew upgrade cliproxyapi && ui_ok "更新完成" || ui_err "更新失败"
-					else
+				"更新")
+					echo
+					if gum confirm "  确认更新 CLIProxyAPI 到最新版本？"; then
 						curl -fsSL https://raw.githubusercontent.com/brokechubb/cliproxyapi-installer/refs/heads/master/cliproxyapi-installer \
 							| bash -s -- upgrade
 						ui_ok "更新完成"
 					fi
-				fi
-				break_end
-				;;
-			"卸载")
-				echo
-				if gum confirm "  ⚡ 确认卸载 CLIProxyAPI？"; then
-					_cliproxy_stop_service 2>/dev/null || true
-					if _cliproxy_is_brew; then
-						brew uninstall cliproxyapi 2>/dev/null || true
-					else
+					break_end
+					;;
+				"卸载")
+					echo
+					if gum confirm "  ⚡ 确认卸载 CLIProxyAPI？将删除 $cliproxy_dir"; then
+						_cliproxy_stop_service 2>/dev/null || true
 						systemctl --user disable cliproxyapi.service >/dev/null 2>&1 || true
 						rm -f "$HOME/.config/systemd/user/cliproxyapi.service" 2>/dev/null || true
 						rm -rf "$cliproxy_dir"
+						ui_ok "CLIProxyAPI 已卸载"
 					fi
-					ui_ok "CLIProxyAPI 已卸载"
-				fi
-				break_end
-				;;
+					break_end
+					;;
 				"退出"|*)
 					break
 					;;
 			esac
 		done
 	}
+
 	beginner_mode_install() {
 		gum style \
 			--bold --foreground 201 \
@@ -933,70 +914,70 @@ PY
 			"" \
 			"[ OpenClaw  ⟶  CLIProxyAPI  ⟶  AI Auth  ⟶  Auto Config ]"
 		echo
+
 		ui_step "第 1 步：安装 OpenClaw"
 		_install_openclaw_core
+
 		ui_step "第 2 步：安装 CLIProxyAPI"
-		if _cliproxy_is_brew; then
-			brew install cliproxyapi 2>/dev/null || { ui_err "brew install cliproxyapi 失败"; break_end; return 1; }
-		else
-			if ! curl -fsSL https://raw.githubusercontent.com/brokechubb/cliproxyapi-installer/refs/heads/master/cliproxyapi-installer | bash; then
-				ui_err "CLIProxyAPI 安装失败"
-				break_end
-				return 1
-			fi
+		if ! curl -fsSL https://raw.githubusercontent.com/brokechubb/cliproxyapi-installer/refs/heads/master/cliproxyapi-installer | bash; then
+			ui_err "CLIProxyAPI 安装失败"
+			break_end
+			return 1
 		fi
-		local cliproxy_config; cliproxy_config="$(_cliproxy_config_file)"
+
+		local cliproxy_config="$HOME/cliproxyapi/config.yaml"
 		if [[ ! -f "$cliproxy_config" ]]; then
 			ui_err "CLIProxyAPI 安装后未找到配置文件: $cliproxy_config"
 			break_end
 			return 1
 		fi
 		ui_ok "CLIProxyAPI 安装完成"
+
 		ui_step "第 3 步：登录 AI 账号"
 		ui_info "通过 OAuth 授权即可免费使用，无需付费 API Key"
 		echo
 		_cliproxy_oauth_login
+
 		ui_step "第 4 步：启动 CLIProxyAPI 服务"
 		if ! _cliproxy_start_service; then
 			break_end
 			return 1
 		fi
+
 		ui_step "第 5 步：配置 OpenClaw API"
+
 		local api_key port base_url
 		api_key=$(awk '
 			/^api-keys:/ { in_keys=1; next }
 			in_keys && /^[^ \t]/ { exit }
 			in_keys && /"sk-/ { match($0, /sk-[^"]+/); print substr($0, RSTART, RLENGTH); exit }
 		' "$cliproxy_config")
-		if [[ -z "$api_key" ]]; then
-			ui_warn "配置中无 API Key，自动生成一个..."
-			api_key="sk-$(python3 -c "import secrets,string; print(''.join(secrets.choice(string.ascii_letters+string.digits) for _ in range(48)))")"
-			python3 - "$cliproxy_config" "$api_key" <<'PY'
-import sys, re
-path, key = sys.argv[1], sys.argv[2]
-txt = open(path).read()
-if 'api-keys:' in txt:
-    txt = re.sub(r'(api-keys:\s*\n)', r'\1  - "' + key + '"\n', txt, count=1)
-else:
-    txt = txt.rstrip('\n') + '\napi-keys:\n  - "' + key + '"\n'
-open(path, 'w').write(txt)
-PY
-			ui_ok "API Key 已写入：${api_key:0:12}****"
-		fi
+
 		port=$(awk '/^port:/ { gsub(/[^0-9]/, "", $2); if ($2 != "") print $2; exit }' "$cliproxy_config")
 		port="${port:-8080}"
 		base_url="http://localhost:${port}/v1"
+
+		if [[ -z "$api_key" ]]; then
+			ui_err "无法从 $cliproxy_config 读取 API Key，请手动在「API管理」中添加"
+			break_end
+			return 1
+		fi
+
 		ui_info "地址：$base_url"
 		ui_info "Key：${api_key:0:12}****"
 		echo
+
 		install jq
 		add-all-models-from-provider "cliproxy" "$base_url" "$api_key"
+
 		if [[ $? -eq 0 ]]; then
 			start_gateway
+
 			ui_step "第 6 步：选择默认模型"
 			ui_info "请从可用模型中选择一个作为默认，选完后网关自动重启"
 			echo
 			change_model
+
 			echo
 			gum style \
 				--bold --foreground 46 \
@@ -1007,6 +988,7 @@ PY
 				"[ OpenClaw 已自动接入 CLIProxyAPI，可直接开始使用 ]" \
 				"[ 更多提供商：cd ~/cliproxyapi && ./cli-proxy-api --help ]"
 		fi
+
 		echo
 		if gum confirm "  现在去对接机器人？"; then
 			change_tg_bot_code
@@ -1014,57 +996,71 @@ PY
 			break_end
 		fi
 	}
+
 	start_bot() {
 		start_gateway
 		break_end
 	}
+
 	stop_bot() {
 		tmux kill-session -t gateway > /dev/null 2>&1
 		gum spin --spinner pulse --title "正在停止网关..." -- openclaw gateway stop
 		break_end
 	}
+
 	view_logs() {
 		openclaw status
 		openclaw gateway status
 		openclaw logs
 		break_end
 	}
+
 	add-all-models-from-provider() {
 		local provider_name="$1"
 		local base_url="$2"
 		local api_key="$3"
 		local config_file="${HOME}/.openclaw/openclaw.json"
+
 		local models_tmpfile
 		models_tmpfile=$(mktemp)
 		gum spin --spinner globe --title "正在获取 $provider_name 的模型列表..." -- \
 			curl -s -m 10 -o "$models_tmpfile" \
 			-H "Authorization: Bearer $api_key" \
 			"${base_url}/models"
+
 		local models_json
 		models_json=$(cat "$models_tmpfile")
 		rm -f "$models_tmpfile"
+
 		if [[ -z "$models_json" ]]; then
 			echo "错误：无法获取模型列表"
 			return 1
 		fi
+
 		local model_ids
 		model_ids=$(echo "$models_json" | grep -oP '"id":\s*"\K[^"]+')
+
 		if [[ -z "$model_ids" ]]; then
 			echo "错误：未找到任何模型"
 			return 1
 		fi
+
 		local model_count
 		model_count=$(echo "$model_ids" | wc -l | tr -d ' ')
 		echo "发现 $model_count 个模型"
+
 		local models_array="["
 		local first=true
+
 		while read -r model_id; do
 			[[ $first == false ]] && models_array+=","
 			first=false
+
 			local context_window=1048576
 			local max_tokens=128000
 			local input_cost=0.15
 			local output_cost=0.60
+
 			case "$model_id" in
 				*opus*|*pro*|*preview*|*thinking*|*sonnet*)
 					input_cost=2.00
@@ -1079,6 +1075,7 @@ PY
 					output_cost=0.40
 					;;
 			esac
+
 			models_array+=$(cat <<EOF
 {
 	"id": "$model_id",
@@ -1096,8 +1093,11 @@ PY
 EOF
 )
 		done <<< "$model_ids"
+
 		models_array+="]"
+
 		[[ -f "$config_file" ]] && cp "$config_file" "${config_file}.bak.$(date +%s)"
+
 		jq --arg prov "$provider_name" \
 		   --arg url "$base_url" \
 		   --arg key "$api_key" \
@@ -1130,6 +1130,7 @@ EOF
 			)
 		)
 		' "$config_file" > "${config_file}.tmp" && mv "${config_file}.tmp" "$config_file"
+
 		if [[ $? -eq 0 ]]; then
 			echo "成功添加 $model_count 个模型到 $provider_name"
 			echo "模型引用格式: $provider_name/<model-id>"
@@ -1139,21 +1140,26 @@ EOF
 			return 1
 		fi
 	}
+
 	add-openclaw-provider-interactive() {
 		local provider_name base_url api_key
+
 		provider_name=$(gum input \
 			--placeholder "Provider 名称 (如: deepseek)" \
 			--prompt "Provider > ")
 		[[ -z "$provider_name" ]] && return 1
+
 		base_url=$(gum input \
 			--placeholder "Base URL (如: https://api.xxx.com/v1)" \
 			--prompt "Base URL > ")
 		[[ -z "$base_url" ]] && return 1
 		base_url="${base_url%/}"
+
 		api_key=$(gum input --password \
 			--placeholder "API Key" \
 			--prompt "API Key > ")
 		[[ -z "$api_key" ]] && return 1
+
 		local models_tmpfile models_json available_models model_count
 		models_tmpfile=$(mktemp)
 		gum spin --spinner globe --title "正在获取模型列表..." -- \
@@ -1162,11 +1168,13 @@ EOF
 			"${base_url}/models"
 		models_json=$(cat "$models_tmpfile")
 		rm -f "$models_tmpfile"
+
 		local default_model=""
 		if [[ -n "$models_json" ]]; then
 			available_models=$(echo "$models_json" | grep -oP '"id":\s*"\K[^"]+' | sort)
 			model_count=$(echo "$available_models" | wc -l | tr -d ' ')
 		fi
+
 		if [[ -n "$available_models" ]]; then
 			default_model=$(echo "$available_models" | fzf \
 				--prompt="  ❯ " \
@@ -1180,6 +1188,7 @@ EOF
 			[[ -z "$default_model" ]] && default_model=$(echo "$available_models" | head -1)
 			default_model=$(awk '{print $1}' <<< "$default_model")
 		fi
+
 		echo
 		gum style \
 			--border normal --border-foreground 99 \
@@ -1190,19 +1199,25 @@ EOF
 			"默认模型  : $default_model" \
 			"模型总数  : $model_count"
 		echo
+
 		gum confirm "确认添加所有 $model_count 个模型？" || { echo "已取消"; return 1; }
+
 		install jq
 		add-all-models-from-provider "$provider_name" "$base_url" "$api_key"
+
 		if [[ $? -eq 0 ]]; then
 			gum spin --spinner minidot --title "设置默认模型并重启网关..." -- \
 				openclaw models set "$provider_name/$default_model"
 			start_gateway
 			echo "完成：所有 $model_count 个模型已加载"
 		fi
+
 		break_end
 	}
+
 	openclaw_api_manage_list() {
 		local config_file="${HOME}/.openclaw/openclaw.json"
+
 		while IFS=$'\t' read -r rec_type idx name base_url model_count latency_txt latency_level; do
 			case "$rec_type" in
 				MSG)
@@ -1216,6 +1231,7 @@ EOF
 						high|unavailable)  latency_color="$gl_hong" ;;
 						unchecked)         latency_color="$gl_bai" ;;
 					esac
+
 					printf '%b\n' "[$idx] ${name} | API: ${base_url} | 模型数量: ${gl_huang}${model_count}${gl_bai} | 延迟/状态: ${latency_color}${latency_txt}${gl_bai}"
 					;;
 			esac
@@ -1227,6 +1243,7 @@ import urllib.request
 
 path = sys.argv[1]
 SUPPORTED_APIS = {'openai-completions', 'openai-responses', 'openai-chat-completions'}
+
 
 def ping_models(base_url, api_key):
     req = urllib.request.Request(
@@ -1240,6 +1257,7 @@ def ping_models(base_url, api_key):
     with urllib.request.urlopen(req, timeout=4) as resp:
         resp.read(2048)
     return int((time.perf_counter() - start) * 1000)
+
 
 def classify_latency(latency):
     if latency == '不可用':
@@ -1255,6 +1273,7 @@ def classify_latency(latency):
             level = 'high'
         return f'{latency}ms', level
     return str(latency), 'unchecked'
+
 
 try:
     with open(path, 'r', encoding='utf-8') as f:
@@ -1310,13 +1329,16 @@ for idx, name in enumerate(sorted(providers.keys()), start=1):
 PY
 )
 	}
+
 	sync-openclaw-provider-interactive() {
 		local config_file="${HOME}/.openclaw/openclaw.json"
+
 		if [[ ! -f "$config_file" ]]; then
 			echo "错误：未找到配置文件: $config_file"
 			break_end
 			return 1
 		fi
+
 		local provider_name
 		provider_name=$(gum input \
 			--placeholder "要同步的 API 名称 (provider)" \
@@ -1326,7 +1348,9 @@ PY
 			break_end
 			return 1
 		fi
+
 		install jq curl >/dev/null 2>&1
+
 		python3 - "$config_file" "$provider_name" <<'PY2'
 import copy
 import json
@@ -1364,8 +1388,10 @@ else:
     defaults_models = {}
 defaults['models'] = defaults_models
 
+
 def model_ref(provider_name, model_id):
     return f"{provider_name}/{model_id}"
+
 
 def get_primary_ref(defaults_obj):
     model_obj = defaults_obj.get('model')
@@ -1377,6 +1403,7 @@ def get_primary_ref(defaults_obj):
             return primary
     return None
 
+
 def set_primary_ref(defaults_obj, new_ref):
     model_obj = defaults_obj.get('model')
     if isinstance(model_obj, str):
@@ -1385,6 +1412,7 @@ def set_primary_ref(defaults_obj, new_ref):
         model_obj['primary'] = new_ref
     else:
         defaults_obj['model'] = {'primary': new_ref}
+
 
 def fetch_remote_models_with_retry(base_url, api_key, retries=3):
     last_error = None
@@ -1405,6 +1433,7 @@ def fetch_remote_models_with_retry(base_url, api_key, retries=3):
             if attempt < retries:
                 time.sleep(1)
     return None, last_error, retries
+
 
 api = provider.get('api', '')
 base_url = provider.get('baseUrl')
@@ -1570,13 +1599,16 @@ else:
     defaults_models = {}
 defaults['models'] = defaults_models
 
+
 def model_ref(provider_name, model_id):
     return f"{provider_name}/{model_id}"
+
 
 def ref_provider(ref):
     if not isinstance(ref, str) or '/' not in ref:
         return None
     return ref.split('/', 1)[0]
+
 
 def get_primary_ref(defaults_obj):
     model_obj = defaults_obj.get('model')
@@ -1588,6 +1620,7 @@ def get_primary_ref(defaults_obj):
             return primary
     return None
 
+
 def set_primary_ref(defaults_obj, new_ref):
     model_obj = defaults_obj.get('model')
     if isinstance(model_obj, str):
@@ -1596,6 +1629,7 @@ def set_primary_ref(defaults_obj, new_ref):
         model_obj['primary'] = new_ref
     else:
         defaults_obj['model'] = {'primary': new_ref}
+
 
 def collect_available_refs(exclude_provider=None):
     refs = []
@@ -1610,6 +1644,7 @@ def collect_available_refs(exclude_provider=None):
             if isinstance(m, dict) and m.get('id'):
                 refs.append(model_ref(pname, str(m['id'])))
     return refs
+
 
 replacement_candidates = collect_available_refs(exclude_provider=name)
 replacement = replacement_candidates[0] if replacement_candidates else None
@@ -1654,14 +1689,17 @@ PY
 			3) echo "错误：无可用替代模型，已保持原配置" ;;
 			*) echo "错误：请检查配置文件结构或日志输出" ;;
 		esac
+
 		break_end
 	}
+
 	openclaw_api_manage_menu() {
 		while true; do
 			clear
 			ui_header "API 管理"
 			openclaw_api_manage_list
 			echo
+
 			local api_choice
 			api_choice=$(gum choose --cursor "❯ " \
 				--header $'选择操作\n↑↓ 移动 · Enter 确认 · q 退出' \
@@ -1669,6 +1707,7 @@ PY
 				"同步 API 供应商模型列表" \
 				"删除 API" \
 				"返回") || return 0
+
 			case "$api_choice" in
 				"添加 API")              add-openclaw-provider-interactive ;;
 				"同步 API 供应商模型列表") sync-openclaw-provider-interactive ;;
@@ -1677,14 +1716,17 @@ PY
 			esac
 		done
 	}
+
 	change_model() {
 		local all_models model
 		all_models=$(openclaw models list --all 2>/dev/null | grep "configured")
+
 		if [[ -z "$all_models" ]]; then
 			ui_err "无法获取可用模型列表（请先添加 API 提供商）"
 			break_end
 			return
 		fi
+
 		model=$(echo "$all_models" | fzf \
 			--prompt="  ❯ " \
 			--header="  当前: $(openclaw models list 2>/dev/null | awk '{print $1}' | head -1)  │  ↑↓ 移动  / 搜索  Enter 确认  Esc 取消" \
@@ -1694,16 +1736,20 @@ PY
 			--border=double \
 			--border-label=" ◈ MODEL SELECT " \
 			--color=border:51,label:51,header:51,prompt:201,pointer:46,marker:208,hl:208,hl+:208) || return
+
 		[[ -z "$model" ]] && return
 		model=$(awk '{print $1}' <<< "$model")
+
 		gum spin --spinner minidot --title "正在切换模型..." -- openclaw models set "$model"
 		start_gateway
 		ui_ok "已切换至：$model"
 		break_end
 	}
+
 	resolve_openclaw_plugin_id() {
 		local raw_input="$1"
 		local plugin_id="$raw_input"
+
 		plugin_id="${plugin_id#@openclaw/}"
 		if [[ "$plugin_id" == @*/* ]]; then
 			plugin_id="${plugin_id##*/}"
@@ -1711,24 +1757,23 @@ PY
 		plugin_id="${plugin_id%%@*}"
 		echo "$plugin_id"
 	}
+
 	sync_openclaw_plugin_allowlist() {
 		local plugin_id="$1"
 		[[ -z "$plugin_id" ]] && return 1
+
 		local home_config="${HOME}/.openclaw/openclaw.json"
-		local root_config
-		if [[ "$(uname -s)" == "Darwin" ]]; then
-			root_config="/var/root/.openclaw/openclaw.json"
-		else
-			root_config="/root/.openclaw/openclaw.json"
-		fi
+		local root_config="/root/.openclaw/openclaw.json"
 		local config_file="$home_config"
 		if [[ ! -f "$home_config" && -f "$root_config" ]]; then
 			config_file="$root_config"
 		fi
+
 		mkdir -p "$(dirname "$config_file")"
 		if [[ ! -s "$config_file" ]]; then
 			echo '{}' > "$config_file"
 		fi
+
 		if command -v jq >/dev/null 2>&1; then
 			local tmp_json
 			tmp_json=$(mktemp)
@@ -1742,6 +1787,7 @@ PY
 			fi
 			rm -f "$tmp_json"
 		fi
+
 		if command -v python3 >/dev/null 2>&1; then
 			if python3 - "$config_file" "$plugin_id" <<'PYTHON_EOF'
 import json
@@ -1778,9 +1824,11 @@ PYTHON_EOF
 				return 0
 			fi
 		fi
+
 		echo "警告：已安装插件，但同步 plugins.allow 失败，请手动检查: $config_file"
 		return 1
 	}
+
 	install_plugin() {
 		while true; do
 			clear
@@ -1802,16 +1850,20 @@ PYTHON_EOF
 			printf "  \033[96m%-20s\033[0m  %s\n" "voice-call"     "语音通话能力"
 			printf "  \033[96m%-20s\033[0m  %s\n" "nostr"          "加密隐私聊天"
 			echo
+
 			local raw_input
 			raw_input=$(gum input \
 				--placeholder "插件 ID (留空退出)" \
 				--prompt "Plugin > ")
 			[[ -z "$raw_input" ]] && break
+
 			local plugin_id plugin_full
 			plugin_id=$(resolve_openclaw_plugin_id "$raw_input")
 			plugin_full="$raw_input"
+
 			local plugin_list
 			plugin_list=$(openclaw plugins list 2>/dev/null)
+
 			if echo "$plugin_list" | grep -qw "$plugin_id" && echo "$plugin_list" | grep "$plugin_id" | grep -q "disabled"; then
 				ui_info "插件 [$plugin_id] 已预装，正在激活..."
 				openclaw plugins enable "$plugin_id" && ui_ok "激活成功" || ui_err "激活失败"
@@ -1820,7 +1872,8 @@ PYTHON_EOF
 				openclaw plugins enable "$plugin_id"
 			else
 				ui_info "本地未发现，尝试下载安装..."
-				rm -rf "$HOME/.openclaw/extensions/$plugin_id" "/root/.openclaw/extensions/$plugin_id"
+				rm -rf "/root/.openclaw/extensions/$plugin_id"
+
 				if openclaw plugins install "$plugin_full"; then
 					ui_ok "下载成功，正在启用..."
 					openclaw plugins enable "$plugin_id"
@@ -1836,11 +1889,13 @@ PYTHON_EOF
 					fi
 				fi
 			fi
+
 			sync_openclaw_plugin_allowlist "$plugin_id"
 			start_gateway
 			break_end
 		done
 	}
+
 	install_skill() {
 		while true; do
 			clear
@@ -1862,11 +1917,13 @@ PYTHON_EOF
 			printf "  \033[96m%-22s\033[0m  %s\n" "openai-whisper"  "本地音频转文字"
 			printf "  \033[96m%-22s\033[0m  %s\n" "coding-agent"    "运行 Claude Code/Codex 等编程助手"
 			echo
+
 			local skill_name
 			skill_name=$(gum input \
 				--placeholder "技能名称 (留空退出)" \
 				--prompt "Skill > ")
 			[[ -z "$skill_name" ]] && break
+
 			local skill_found=false
 			if [[ -d "${HOME}/.openclaw/workspace/skills/${skill_name}" ]]; then
 				echo "技能 [$skill_name] 已在用户目录安装"
@@ -1875,9 +1932,11 @@ PYTHON_EOF
 				echo "技能 [$skill_name] 已在系统目录安装"
 				skill_found=true
 			fi
+
 			if [[ "$skill_found" == true ]]; then
 				gum confirm "是否重新安装？" || { break_end; continue; }
 			fi
+
 			gum spin --spinner globe --title "正在安装技能 $skill_name..." -- npx clawhub install "$skill_name"
 			if [[ $? -eq 0 ]]; then
 				echo "技能 $skill_name 安装成功"
@@ -1885,9 +1944,11 @@ PYTHON_EOF
 			else
 				echo "错误：安装失败，请检查技能名称是否正确"
 			fi
+
 			break_end
 		done
 	}
+
 	openclaw_json_get_bool() {
 		local expr="$1"
 		local config_file="${HOME}/.openclaw/openclaw.json"
@@ -1897,6 +1958,7 @@ PYTHON_EOF
 		fi
 		jq -r "$expr" "$config_file" 2>/dev/null || echo "false"
 	}
+
 	openclaw_channel_has_cfg() {
 		local channel="$1"
 		local config_file="${HOME}/.openclaw/openclaw.json"
@@ -1918,10 +1980,12 @@ PYTHON_EOF
 			  end
 		' "$config_file" 2>/dev/null || echo "false"
 	}
+
 	openclaw_dir_has_files() {
 		local dir="$1"
 		[[ -d "$dir" ]] && find "$dir" -type f -print -quit 2>/dev/null | grep -q .
 	}
+
 	openclaw_plugin_local_installed() {
 		local plugin="$1"
 		local config_file="${HOME}/.openclaw/openclaw.json"
@@ -1930,6 +1994,7 @@ PYTHON_EOF
 		fi
 		[[ -d "${HOME}/.openclaw/extensions/${plugin}" ]] || [[ -d "/usr/lib/node_modules/openclaw/extensions/${plugin}" ]]
 	}
+
 	openclaw_bot_status_text() {
 		local enabled="$1"
 		local configured="$2"
@@ -1947,6 +2012,7 @@ PYTHON_EOF
 			echo "未配置"
 		fi
 	}
+
 	openclaw_colorize_bot_status() {
 		local status="$1"
 		case "$status" in
@@ -1956,17 +2022,20 @@ PYTHON_EOF
 			*)      echo "$status" ;;
 		esac
 	}
+
 	openclaw_print_bot_status_line() {
 		local label="$1"
 		local status="$2"
 		echo -e "- ${label}: $(openclaw_colorize_bot_status "$status")"
 	}
+
 	openclaw_show_bot_local_status_block() {
 		local config_file="${HOME}/.openclaw/openclaw.json"
 		local json_ok="false"
 		if [[ -s "$config_file" ]] && jq empty "$config_file" >/dev/null 2>&1; then
 			json_ok="true"
 		fi
+
 		local tg_enabled tg_cfg tg_connected tg_abnormal tg_status
 		tg_enabled=$(openclaw_json_get_bool '.channels.telegram.enabled // .plugins.entries.telegram.enabled // false')
 		tg_cfg=$(openclaw_channel_has_cfg "telegram")
@@ -1979,6 +2048,7 @@ PYTHON_EOF
 			tg_abnormal="true"
 		fi
 		tg_status=$(openclaw_bot_status_text "$tg_enabled" "$tg_cfg" "$tg_connected" "$tg_abnormal")
+
 		local feishu_enabled feishu_cfg feishu_connected feishu_abnormal feishu_status
 		feishu_enabled=$(openclaw_json_get_bool '.plugins.entries.feishu.enabled // .channels.feishu.enabled // false')
 		feishu_cfg=$(openclaw_channel_has_cfg "feishu")
@@ -1994,6 +2064,7 @@ PYTHON_EOF
 			feishu_abnormal="true"
 		fi
 		feishu_status=$(openclaw_bot_status_text "$feishu_enabled" "$feishu_cfg" "$feishu_connected" "$feishu_abnormal")
+
 		local wa_enabled wa_cfg wa_connected wa_abnormal wa_status
 		wa_enabled=$(openclaw_json_get_bool '.plugins.entries.whatsapp.enabled // .channels.whatsapp.enabled // false')
 		wa_cfg=$(openclaw_channel_has_cfg "whatsapp")
@@ -2009,6 +2080,7 @@ PYTHON_EOF
 			wa_abnormal="true"
 		fi
 		wa_status=$(openclaw_bot_status_text "$wa_enabled" "$wa_cfg" "$wa_connected" "$wa_abnormal")
+
 		local dc_enabled dc_cfg dc_connected dc_abnormal dc_status
 		dc_enabled=$(openclaw_json_get_bool '.channels.discord.enabled // .plugins.entries.discord.enabled // false')
 		dc_cfg=$(openclaw_channel_has_cfg "discord")
@@ -2021,6 +2093,7 @@ PYTHON_EOF
 			dc_abnormal="true"
 		fi
 		dc_status=$(openclaw_bot_status_text "$dc_enabled" "$dc_cfg" "$dc_connected" "$dc_abnormal")
+
 		local slack_enabled slack_cfg slack_connected slack_abnormal slack_status
 		slack_enabled=$(openclaw_json_get_bool '.plugins.entries.slack.enabled // .channels.slack.enabled // false')
 		slack_cfg=$(openclaw_channel_has_cfg "slack")
@@ -2036,6 +2109,7 @@ PYTHON_EOF
 			slack_abnormal="true"
 		fi
 		slack_status=$(openclaw_bot_status_text "$slack_enabled" "$slack_cfg" "$slack_connected" "$slack_abnormal")
+
 		local qq_enabled qq_cfg qq_connected qq_abnormal qq_status
 		qq_enabled=$(openclaw_json_get_bool '.plugins.entries.qqbot.enabled // .channels.qqbot.enabled // false')
 		qq_cfg=$(openclaw_channel_has_cfg "qqbot")
@@ -2051,6 +2125,7 @@ PYTHON_EOF
 			qq_abnormal="true"
 		fi
 		qq_status=$(openclaw_bot_status_text "$qq_enabled" "$qq_cfg" "$qq_connected" "$qq_abnormal")
+
 		echo "本地状态（仅本机配置/缓存，不做网络探测）："
 		openclaw_print_bot_status_line "Telegram"   "$tg_status"
 		openclaw_print_bot_status_line "飞书(Lark)" "$feishu_status"
@@ -2059,12 +2134,14 @@ PYTHON_EOF
 		openclaw_print_bot_status_line "Slack"      "$slack_status"
 		openclaw_print_bot_status_line "QQ Bot"     "$qq_status"
 	}
+
 	change_tg_bot_code() {
 		while true; do
 			clear
 			ui_header "机器人连接对接"
 			openclaw_show_bot_local_status_block
 			echo
+
 			local bot_choice
 			bot_choice=$(gum choose --cursor "❯ " \
 				--header $'选择要对接的平台\n↑↓ 移动 · Enter 确认 · q 退出' \
@@ -2072,6 +2149,7 @@ PYTHON_EOF
 				"飞书 (Lark) 机器人对接" \
 				"WhatsApp 机器人对接" \
 				"返回") || return 0
+
 			local code
 			case "$bot_choice" in
 				"Telegram 机器人对接")
@@ -2104,15 +2182,19 @@ PYTHON_EOF
 			esac
 		done
 	}
+
 	openclaw_backup_root() {
 		echo "${HOME}/.openclaw/backups"
 	}
+
 	openclaw_is_interactive_terminal() {
 		[[ -t 0 && -t 1 ]]
 	}
+
 	openclaw_has_command() {
 		command -v "$1" >/dev/null 2>&1
 	}
+
 	openclaw_is_safe_relpath() {
 		local rel="$1"
 		[[ -z "$rel" ]] && return 1
@@ -2127,6 +2209,7 @@ PYTHON_EOF
 		esac
 		return 0
 	}
+
 	openclaw_restore_path_allowed() {
 		local mode="$1"
 		local rel="$2"
@@ -2148,16 +2231,20 @@ PYTHON_EOF
 				;;
 		esac
 	}
+
 	openclaw_pack_backup_archive() {
 		local backup_type="$1"
 		local export_mode="$2"
 		local payload_dir="$3"
 		local output_file="$4"
+
 		local tmp_root
 		tmp_root=$(mktemp -d) || return 1
 		local pack_dir="$tmp_root/package"
 		mkdir -p "$pack_dir"
+
 		cp -a "$payload_dir" "$pack_dir/payload"
+
 		(
 			cd "$pack_dir/payload" || exit 1
 			find . -type f | sed 's|^\./||' | sort > "$pack_dir/manifest.files"
@@ -2168,18 +2255,21 @@ PYTHON_EOF
 				sha256sum "$f" >> "$pack_dir/manifest.sha256"
 			done < "$pack_dir/manifest.files"
 		) || { rm -rf "$tmp_root"; return 1; }
+
 		cat > "$pack_dir/backup.meta" <<EOF
 TYPE=$backup_type
 MODE=$export_mode
 CREATED_AT=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 HOST=$(hostname)
 EOF
+
 		mkdir -p "$(dirname "$output_file")"
 		tar -C "$pack_dir" -czf "$output_file" backup.meta manifest.files manifest.sha256 payload
 		local rc=$?
 		rm -rf "$tmp_root"
 		return $rc
 	}
+
 	openclaw_offer_transfer_hint() {
 		local file_path="$1"
 		echo "可使用以下方式下载备份文件："
@@ -2187,10 +2277,12 @@ EOF
 		echo "  scp 示例: scp root@你的服务器:$file_path ./"
 		echo "  或使用 SFTP 客户端下载"
 	}
+
 	openclaw_prepare_import_archive() {
 		local expected_type="$1"
 		local archive_path="$2"
 		local unpack_root="$3"
+
 		if [[ ! -f "$archive_path" ]]; then
 			echo "错误：文件不存在: $archive_path"
 			return 1
@@ -2200,10 +2292,12 @@ EOF
 			echo "错误：备份包解压失败"
 			return 1
 		fi
+
 		local pkg_dir="$unpack_root/package"
 		if [[ -f "$unpack_root/backup.meta" ]]; then
 			pkg_dir="$unpack_root"
 		fi
+
 		local required
 		for required in backup.meta manifest.files manifest.sha256 payload; do
 			if [[ ! -e "$pkg_dir/$required" ]]; then
@@ -2211,19 +2305,23 @@ EOF
 				return 1
 			fi
 		done
+
 		local real_type
 		real_type=$(grep '^TYPE=' "$pkg_dir/backup.meta" | head -n1 | cut -d'=' -f2-)
 		if [[ "$real_type" != "$expected_type" ]]; then
 			echo "错误：备份类型不匹配，期望: $expected_type，实际: ${real_type:-未知}"
 			return 1
 		fi
+
 		(
 			cd "$pkg_dir/payload" || exit 1
 			sha256sum -c ../manifest.sha256 >/dev/null
 		) || { echo "错误：sha256 校验失败，拒绝还原"; return 1; }
+
 		echo "$pkg_dir"
 		return 0
 	}
+
 	openclaw_memory_backup_export() {
 		local workspace_dir="${HOME}/.openclaw/workspace"
 		local backup_root
@@ -2231,28 +2329,34 @@ EOF
 		local ts
 		ts=$(date +%Y%m%d-%H%M%S)
 		local out_file="$backup_root/openclaw-memory-full-${ts}.tar.gz"
+
 		mkdir -p "$backup_root"
 		if [[ ! -d "$workspace_dir" ]]; then
 			echo "错误：未找到 workspace 目录: $workspace_dir"
 			break_end
 			return 1
 		fi
+
 		local tmp_payload
 		tmp_payload=$(mktemp -d) || return 1
+
 		[[ -f "$workspace_dir/MEMORY.md" ]] && cp -a "$workspace_dir/MEMORY.md" "$tmp_payload/"
 		[[ -d "$workspace_dir/memory" ]]    && cp -a "$workspace_dir/memory"    "$tmp_payload/"
+
 		if gum confirm "是否附带 AGENTS/USER/SOUL/TOOLS 文件？"; then
 			local f
 			for f in AGENTS.md USER.md SOUL.md TOOLS.md; do
 				[[ -f "$workspace_dir/$f" ]] && cp -a "$workspace_dir/$f" "$tmp_payload/"
 			done
 		fi
+
 		if ! find "$tmp_payload" -mindepth 1 -print -quit | grep -q .; then
 			echo "错误：未找到可备份的记忆文件"
 			rm -rf "$tmp_payload"
 			break_end
 			return 1
 		fi
+
 		if gum spin --spinner meter --title "正在打包备份..." -- \
 			openclaw_pack_backup_archive "memory-full" "default" "$tmp_payload" "$out_file"; then
 			echo "记忆全量备份完成: $out_file"
@@ -2260,34 +2364,43 @@ EOF
 		else
 			echo "错误：记忆全量备份失败"
 		fi
+
 		rm -rf "$tmp_payload"
 		break_end
 	}
+
 	openclaw_read_import_path() {
 		local file_input file_path backup_root
 		echo "提示：输入文件名时默认在备份目录查找；输入含 / 的路径时按完整路径校验。" >&2
 		echo "scp 示例: scp /本地/备份包.tar.gz root@你的服务器:/tmp/" >&2
+
 		file_input=$(gum input \
 			--placeholder "备份文件名或完整路径" \
 			--prompt "Path > ")
 		[[ -z "$file_input" ]] && { echo ""; return 0; }
+
 		backup_root=$(openclaw_backup_root)
 		mkdir -p "$backup_root"
+
 		if [[ "$file_input" == */* ]]; then
 			file_path="$file_input"
 		else
 			file_path="$backup_root/$file_input"
 		fi
+
 		if [[ ! -f "$file_path" ]]; then
 			echo "错误：备份文件不存在: $file_path" >&2
 			echo ""
 			return 1
 		fi
+
 		echo "$file_path"
 	}
+
 	openclaw_memory_backup_import() {
 		local workspace_dir="${HOME}/.openclaw/workspace"
 		mkdir -p "$workspace_dir"
+
 		local archive_path
 		archive_path=$(openclaw_read_import_path)
 		if [[ -z "$archive_path" ]]; then
@@ -2295,6 +2408,7 @@ EOF
 			break_end
 			return 1
 		fi
+
 		local tmp_unpack pkg_dir
 		tmp_unpack=$(mktemp -d) || return 1
 		pkg_dir=$(openclaw_prepare_import_archive "memory-full" "$archive_path" "$tmp_unpack")
@@ -2303,6 +2417,7 @@ EOF
 			break_end
 			return 1
 		fi
+
 		local invalid=0
 		local valid_list
 		valid_list=$(mktemp)
@@ -2316,6 +2431,7 @@ EOF
 			fi
 			echo "$rel" >> "$valid_list"
 		done < "$pkg_dir/manifest.files"
+
 		if [[ "$invalid" -ne 0 ]]; then
 			rm -f "$valid_list"
 			rm -rf "$tmp_unpack"
@@ -2323,15 +2439,18 @@ EOF
 			break_end
 			return 1
 		fi
+
 		while IFS= read -r rel; do
 			mkdir -p "$workspace_dir/$(dirname "$rel")"
 			cp -a "$pkg_dir/payload/$rel" "$workspace_dir/$rel"
 		done < "$valid_list"
+
 		rm -f "$valid_list"
 		rm -rf "$tmp_unpack"
 		echo "记忆全量还原完成"
 		break_end
 	}
+
 	openclaw_project_backup_export() {
 		local openclaw_root="${HOME}/.openclaw"
 		if [[ ! -d "$openclaw_root" ]]; then
@@ -2339,14 +2458,17 @@ EOF
 			break_end
 			return 1
 		fi
+
 		local export_mode_label
 		export_mode_label=$(gum choose --cursor "❯ " \
 			--header $'选择备份模式\n↑↓ 移动 · Enter 确认 · q 取消' \
 			"安全模式（推荐）：workspace + openclaw.json + extensions/skills/prompts/tools" \
 			"完整模式（含更多状态，敏感风险更高）") || return 1
+
 		local mode_label="safe"
 		local tmp_payload
 		tmp_payload=$(mktemp -d) || return 1
+
 		local d
 		if [[ "$export_mode_label" == 完整* ]]; then
 			mode_label="full"
@@ -2364,16 +2486,19 @@ EOF
 				[[ -e "$openclaw_root/$d" ]] && cp -a "$openclaw_root/$d" "$tmp_payload/"
 			done
 		fi
+
 		if ! find "$tmp_payload" -mindepth 1 -print -quit | grep -q .; then
 			echo "错误：未找到可备份的 OpenClaw 项目内容"
 			rm -rf "$tmp_payload"
 			break_end
 			return 1
 		fi
+
 		local backup_root
 		backup_root=$(openclaw_backup_root)
 		mkdir -p "$backup_root"
 		local out_file="$backup_root/openclaw-project-${mode_label}-$(date +%Y%m%d-%H%M%S).tar.gz"
+
 		if gum spin --spinner meter --title "正在打包备份..." -- \
 			openclaw_pack_backup_archive "openclaw-project" "$mode_label" "$tmp_payload" "$out_file"; then
 			echo "OpenClaw 项目备份完成 (${mode_label}): $out_file"
@@ -2381,14 +2506,18 @@ EOF
 		else
 			echo "错误：OpenClaw 项目备份失败"
 		fi
+
 		rm -rf "$tmp_payload"
 		break_end
 	}
+
 	openclaw_project_backup_import() {
 		local openclaw_root="${HOME}/.openclaw"
 		mkdir -p "$openclaw_root"
+
 		echo "警告：高风险操作，项目还原会覆盖 OpenClaw 配置与工作区内容。"
 		gum confirm "确认继续还原？此操作不可逆。" || { echo "已取消"; break_end; return 1; }
+
 		local archive_path
 		archive_path=$(openclaw_read_import_path)
 		if [[ -z "$archive_path" ]]; then
@@ -2396,6 +2525,7 @@ EOF
 			break_end
 			return 1
 		fi
+
 		local tmp_unpack pkg_dir
 		tmp_unpack=$(mktemp -d) || return 1
 		pkg_dir=$(openclaw_prepare_import_archive "openclaw-project" "$archive_path" "$tmp_unpack")
@@ -2404,6 +2534,7 @@ EOF
 			break_end
 			return 1
 		fi
+
 		local invalid=0
 		local valid_list
 		valid_list=$(mktemp)
@@ -2417,6 +2548,7 @@ EOF
 			fi
 			echo "$rel" >> "$valid_list"
 		done < "$pkg_dir/manifest.files"
+
 		if [[ "$invalid" -ne 0 ]]; then
 			rm -f "$valid_list"
 			rm -rf "$tmp_unpack"
@@ -2424,23 +2556,28 @@ EOF
 			break_end
 			return 1
 		fi
+
 		if command -v openclaw >/dev/null 2>&1; then
 			gum spin --spinner pulse --title "停止 OpenClaw gateway..." -- openclaw gateway stop
 		fi
+
 		while IFS= read -r rel; do
 			mkdir -p "$openclaw_root/$(dirname "$rel")"
 			cp -a "$pkg_dir/payload/$rel" "$openclaw_root/$rel"
 		done < "$valid_list"
+
 		if command -v openclaw >/dev/null 2>&1; then
 			start_gateway
 			echo "gateway 健康检查："
 			openclaw gateway status || true
 		fi
+
 		rm -f "$valid_list"
 		rm -rf "$tmp_unpack"
 		echo "OpenClaw 项目还原完成"
 		break_end
 	}
+
 	openclaw_backup_detect_type() {
 		local file_name="$1"
 		if [[ "$file_name" == openclaw-memory-full-*.tar.gz ]]; then
@@ -2451,22 +2588,26 @@ EOF
 			echo "其他备份文件"
 		fi
 	}
+
 	openclaw_backup_collect_files() {
 		local backup_root
 		backup_root=$(openclaw_backup_root)
 		mkdir -p "$backup_root"
 		mapfile -t OPENCLAW_BACKUP_FILES < <(find "$backup_root" -maxdepth 1 -type f -name '*.tar.gz' -printf '%f\n' | sort -r)
 	}
+
 	openclaw_backup_render_file_list() {
 		local backup_root i file_name file_path file_type file_size file_time
 		local has_memory=0 has_project=0 has_other=0
 		backup_root=$(openclaw_backup_root)
 		openclaw_backup_collect_files
+
 		echo "备份目录: $backup_root"
 		if [[ ${#OPENCLAW_BACKUP_FILES[@]} -eq 0 ]]; then
 			echo "暂无备份文件"
 			return 0
 		fi
+
 		for i in "${!OPENCLAW_BACKUP_FILES[@]}"; do
 			file_type=$(openclaw_backup_detect_type "${OPENCLAW_BACKUP_FILES[$i]}")
 			case "$file_type" in
@@ -2475,6 +2616,7 @@ EOF
 				"其他备份文件") has_other=1 ;;
 			esac
 		done
+
 		if [[ "$has_memory" -eq 1 ]]; then
 			echo "记忆备份文件"
 			for i in "${!OPENCLAW_BACKUP_FILES[@]}"; do
@@ -2487,6 +2629,7 @@ EOF
 				printf "  %s | %s | %s\n" "$file_name" "$file_size" "$file_time"
 			done
 		fi
+
 		if [[ "$has_project" -eq 1 ]]; then
 			echo "项目备份文件"
 			for i in "${!OPENCLAW_BACKUP_FILES[@]}"; do
@@ -2499,6 +2642,7 @@ EOF
 				printf "  %s | %s | %s\n" "$file_name" "$file_size" "$file_time"
 			done
 		fi
+
 		if [[ "$has_other" -eq 1 ]]; then
 			echo "其他备份文件"
 			for i in "${!OPENCLAW_BACKUP_FILES[@]}"; do
@@ -2512,6 +2656,7 @@ EOF
 			done
 		fi
 	}
+
 	openclaw_backup_file_exists_in_list() {
 		local target_file="$1"
 		local item
@@ -2520,14 +2665,17 @@ EOF
 		done
 		return 1
 	}
+
 	openclaw_backup_delete_file() {
 		local backup_root backup_root_real user_input target_file target_path target_type
 		backup_root=$(openclaw_backup_root)
+
 		openclaw_backup_render_file_list
 		if [[ ${#OPENCLAW_BACKUP_FILES[@]} -eq 0 ]]; then
 			break_end
 			return 0
 		fi
+
 		user_input=$(printf '%s\n' "${OPENCLAW_BACKUP_FILES[@]}" | fzf \
 			--prompt="  ❯ " \
 			--header="  选择要删除的备份  │  ↑↓ 移动  / 搜索  Enter 确认  Esc 取消" \
@@ -2536,19 +2684,25 @@ EOF
 			--border=double \
 			--border-label=" ⚡ DELETE BACKUP " \
 			--color=border:196,label:196,header:196,prompt:208,pointer:196,marker:208,hl:208,hl+:208) || { echo "已取消"; break_end; return 0; }
+
 		[[ -z "$user_input" ]] && { echo "已取消"; break_end; return 0; }
+
 		backup_root_real=$(realpath -m "$backup_root")
 		target_file=$(basename -- "$user_input")
 		target_path="$backup_root/$target_file"
+
 		if [[ ! -f "$target_path" ]]; then
 			echo "错误：目标文件不存在: $target_path"
 			break_end
 			return 1
 		fi
+
 		target_type=$(openclaw_backup_detect_type "$target_file")
+
 		echo "即将删除: [$target_type] $target_path"
 		gum confirm "确认删除？" || { echo "已取消删除"; break_end; return 0; }
 		gum confirm "请再次确认，删除后不可恢复" || { echo "已取消删除"; break_end; return 0; }
+
 		if rm -f -- "$target_path"; then
 			echo "删除成功: $target_file"
 		else
@@ -2556,16 +2710,19 @@ EOF
 		fi
 		break_end
 	}
+
 	openclaw_backup_list_files() {
 		openclaw_backup_render_file_list
 		break_end
 	}
+
 	openclaw_backup_restore_menu() {
 		while true; do
 			clear
 			ui_header "备份与还原"
 			openclaw_backup_render_file_list
 			echo
+
 			local backup_choice
 			backup_choice=$(gum choose --cursor "❯ " \
 				--header $'选择操作\n↑↓ 移动 · Enter 确认 · q 退出' \
@@ -2575,6 +2732,7 @@ EOF
 				"还原 OpenClaw 项目（高风险）" \
 				"删除备份文件" \
 				"返回") || return 0
+
 			case "$backup_choice" in
 				"备份记忆全量")               openclaw_memory_backup_export ;;
 				"还原记忆全量")               openclaw_memory_backup_import ;;
@@ -2585,6 +2743,7 @@ EOF
 			esac
 		done
 	}
+
 	update_moltbot() {
 		install_node_and_tools
 		gum spin --spinner globe --title "正在更新 OpenClaw..." -- npm install -g openclaw@latest
@@ -2595,27 +2754,32 @@ EOF
 		ui_ok "更新完成"
 		break_end
 	}
+
 	uninstall_moltbot() {
 		gum confirm "确认卸载 OpenClaw？此操作不可逆。" || return 0
+
 		gum spin --spinner meter --title "正在卸载 OpenClaw..." -- openclaw uninstall
 		npm uninstall -g openclaw
 		crontab -l 2>/dev/null | grep -v "s gateway" | crontab -
-		rm -rf "$HOME/.openclaw" /root/.openclaw
+		rm -rf /root/.openclaw
 		hash -r
-		[[ -f /home/docker/appno.txt ]] && _sed_i "/\b${app_id}\b/d" /home/docker/appno.txt
-		rm -f "$HOME/.local/bin/oc" "$HOME/.local/bin/openclawctl.sh" \
-			/usr/local/bin/oc /opt/homebrew/bin/oc
+		sed -i "/\b${app_id}\b/d" /home/docker/appno.txt
+
+		rm -f "$HOME/.local/bin/oc" "$HOME/.local/bin/openclawctl.sh" /usr/local/bin/oc
 		for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
-			[[ -f "$rc" ]] && _sed_i '/\.local\/bin.*PATH/d' "$rc"
+			[[ -f "$rc" ]] && sed -i '/\.local\/bin.*PATH/d' "$rc"
 		done
+
 		ui_ok "卸载完成"
 		break_end
 	}
+
 	nano_openclaw_json() {
 		install nano
 		nano ~/.openclaw/openclaw.json
 		start_gateway
 	}
+
 	openclaw_find_webui_domain() {
 		local conf domain_list
 		domain_list=$(
@@ -2626,21 +2790,26 @@ EOF
 				basename "$conf" .conf
 			done
 		)
+
 		if [[ -n "$domain_list" ]]; then
 			echo "$domain_list"
 		fi
 	}
+
 	openclaw_show_webui_addr() {
 		local local_ip token domains
+
 		local_ip="127.0.0.1"
 		token=$(
 			openclaw dashboard 2>/dev/null \
 			| sed -n 's/.*:18789\/#token=\([a-f0-9]\+\).*/\1/p' \
 			| head -n 1
 		)
+
 		gum style --border normal --border-foreground 99 --padding "0 2" \
 			"OpenClaw WebUI 访问地址" \
 			"本机: http://${local_ip}:18789/#token=${token}"
+
 		domains=$(openclaw_find_webui_domain)
 		if [[ -n "$domains" ]]; then
 			echo "$domains" | while read -r d; do
@@ -2648,20 +2817,25 @@ EOF
 			done
 		fi
 	}
+
 	openclaw_domain_webui() {
 		add_yuming
 		ldnmp_Proxy "${yuming}" 127.0.0.1 18789
+
 		local token
 		token=$(
 			openclaw dashboard 2>/dev/null \
 			| sed -n 's/.*:18789\/#token=\([a-f0-9]\+\).*/\1/p' \
 			| head -n 1
 		)
+
 		clear
 		echo "访问地址: https://${yuming}/#token=$token"
 		echo "先访问URL触发设备ID，然后回车下一步进行配对。"
 		gum input --placeholder "按回车继续..." > /dev/null
+
 		echo -e "${gl_kjlan}正在加载设备列表……${gl_bai}"
+
 		local config_file="$HOME/.openclaw/openclaw.json"
 		if [[ -f "$config_file" ]]; then
 			local new_origin="https://${yuming}"
@@ -2674,33 +2848,41 @@ EOF
 				openclaw gateway restart >/dev/null 2>&1
 			fi
 		fi
+
 		openclaw devices list
+
 		local Request_Key
 		Request_Key=$(gum input \
 			--placeholder "Request_Key" \
 			--prompt "> ")
+
 		if [[ -z "$Request_Key" ]]; then
 			echo "Request_Key 不能为空"
 			return 1
 		fi
+
 		openclaw devices approve "$Request_Key"
 	}
+
 	openclaw_remove_domain() {
 		echo "域名格式 example.com 不带https://"
 		web_del
 	}
+
 	openclaw_webui_menu() {
 		while true; do
 			clear
 			ui_header "WebUI 访问与设置"
 			openclaw_show_webui_addr
 			echo
+
 			local choice
 			choice=$(gum choose --cursor "❯ " \
 				--header $'选择操作\n↑↓ 移动 · Enter 确认 · q 退出' \
 				"添加域名访问" \
 				"删除域名访问" \
 				"退出") || break
+
 			case "$choice" in
 				"添加域名访问")
 					openclaw_domain_webui
@@ -2717,12 +2899,15 @@ EOF
 			esac
 		done
 	}
+
 	while true; do
 		clear
+
 		local install_status running_status update_info
 		install_status=$(get_install_status)
 		running_status=$(get_running_status)
 		update_info=$(check_openclaw_update)
+
 		gum style \
 			--bold --foreground 51 \
 			--border double --border-foreground 51 \
@@ -2742,6 +2927,7 @@ EOF
 			"$(gum style --bold --foreground 51  '▶  Telegram  t.me/+ft-zI76oovgwNmRh')" \
 			"$(gum style --foreground 208        '⚡ 基于：kejilion · cliproxyapi-installer')"
 		echo
+
 		local choice
 		choice=$(gum choose \
 			--height 24 \
@@ -2767,6 +2953,7 @@ EOF
 			"更新" \
 			"卸载" \
 			"退出") || break
+
 		case "$choice" in
 			"小白模式安装（推荐）") beginner_mode_install ;;
 			"安装")         install_moltbot ;;
@@ -2805,6 +2992,7 @@ EOF
 		esac
 	done
 }
+
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 	moltbot_menu
 fi
