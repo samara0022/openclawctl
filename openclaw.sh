@@ -787,6 +787,70 @@ PY
 		fi
 	}
 
+# ==================== 【自定义新增】一键对接 cliproxy 到 OpenClaw ====================
+add_cliproxy_to_openclaw() {
+    local cliproxy_dir="$HOME/cliproxyapi"
+    local config_file="$cliproxy_dir/config.yaml"
+    local openclaw_json="${HOME}/.openclaw/openclaw.json"
+
+    [[ ! -f "$config_file" ]] && { ui_err "CLIProxyAPI 未安装或配置文件不存在"; break_end; return 1; }
+    [[ ! -f "$openclaw_json" ]] && { ui_err "OpenClaw 未安装或配置文件不存在"; break_end; return 1; }
+
+    local port key
+    port=$(awk '/^port:/ { gsub(/[^0-9]/,"",$2); print $2; exit }' "$config_file" 2>/dev/null || echo "8317")
+    key=$(awk '/^api-keys:/{f=1;next} f&&/"sk-/{print $2; exit}' "$config_file" 2>/dev/null | tr -d '"')
+
+    [[ -z "$key" ]] && { ui_err "未找到有效的 API Key，请先执行「生成并添加 API Key」"; break_end; return 1; }
+
+    echo
+    gum style --bold --foreground 46 "正在自动对接 cliproxy 到 OpenClaw..."
+    echo "端口: $port | Key: ${key:0:8}******"
+
+    python3 - "$openclaw_json" "$port" "$key" <<'PY'
+import json, sys
+path, port, key = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(path, 'r', encoding='utf-8') as f:
+    obj = json.load(f)
+
+providers = obj.setdefault('models', {}).setdefault('providers', {})
+cliproxy = providers.setdefault('cliproxy', {})
+
+cliproxy.update({
+    "baseUrl": f"http://127.0.0.1:{port}",
+    "apiKey": key,
+    "api": "anthropic-messages",
+    "headers": {
+        "User-Agent": "claude-cli/2.1.44 (external, sdk-cli)"
+    },
+    "models": [
+        {"id": "claude-opus-4-6", "name": "Claude Opus 4.6 (Proxy)"},
+        {"id": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6 (Proxy)"},
+        {"id": "claude-haiku-4-6", "name": "Claude Haiku 4.6 (Proxy)"}
+    ]
+})
+
+agents = obj.setdefault('agents', {})
+defaults = agents.setdefault('defaults', {})
+model_cfg = defaults.setdefault('model', {})
+if isinstance(model_cfg, str):
+    defaults['model'] = {'primary': "cliproxy/claude-opus-4-6", "fallbacks": ["cliproxy/claude-sonnet-4-6"]}
+else:
+    model_cfg['primary'] = "cliproxy/claude-opus-4-6"
+    model_cfg.setdefault('fallbacks', ["cliproxy/claude-sonnet-4-6"])
+
+with open(path, 'w', encoding='utf-8') as f:
+    json.dump(obj, f, ensure_ascii=False, indent=2)
+    f.write('\n')
+
+print("✅ cliproxy provider 已成功写入 openclaw.json")
+PY
+
+    ui_ok "对接完成！正在同步模型..."
+    sync_openclaw_api_models 2>/dev/null || ui_warn "模型同步函数未找到（可忽略）"
+    ui_ok "全部完成！现在可在 OpenClaw 里使用 cliproxy/claude-xxx 模型"
+    break_end
+}
+
 	cliproxyapi_manage_menu() {
 		local cliproxy_dir="$HOME/cliproxyapi"
 		local config_file="$cliproxy_dir/config.yaml"
@@ -832,6 +896,7 @@ PY
 				"查看日志" \
 				"账号授权登录" \
 				"生成并添加 API Key" \
+				"一键对接 OpenClaw（自动添加 cliproxy provider）" \
 				"查看 API Keys" \
 				"编辑配置文件" \
 				"更新" \
@@ -893,6 +958,10 @@ PY
 					fi
 					break_end
 					;;
+				"一键对接 OpenClaw（自动添加 cliproxy provider）")
+                    add_cliproxy_to_openclaw
+					break_end
+                    ;;
 				"查看 API Keys")
 					echo
 					if [[ -f "$config_file" ]]; then
