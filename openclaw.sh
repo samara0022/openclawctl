@@ -239,8 +239,6 @@ EOF
 }
 
 moltbot_menu() {
-	local app_id="114"
-
 	_install_shortcut
 
 	install_base_deps
@@ -305,18 +303,18 @@ moltbot_menu() {
 	}
 
 	install_node_and_tools() {
+		if command -v node &>/dev/null && command -v npm &>/dev/null; then
+			return 0
+		fi
+		echo "正在安装 Node.js..."
 		if command -v dnf &>/dev/null; then
-			curl -fsSL https://rpm.nodesource.com/setup_24.x | sudo bash -
-			dnf update -y
-			dnf group install -y "Development Tools" "Development Libraries"
-			dnf install -y cmake libatomic nodejs
+			curl -fsSL https://rpm.nodesource.com/setup_24.x | bash - &>/dev/null
+			dnf install -y cmake libatomic nodejs &>/dev/null
+		elif command -v apt &>/dev/null; then
+			curl -fsSL https://deb.nodesource.com/setup_24.x | bash - &>/dev/null
+			DEBIAN_FRONTEND=noninteractive apt install -y build-essential python3 libatomic1 nodejs &>/dev/null
 		fi
-
-		if command -v apt &>/dev/null; then
-			curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
-			apt update -y
-			apt install build-essential python3 libatomic1 nodejs -y
-		fi
+		hash -r 2>/dev/null || true
 	}
 
 	configure_openclaw_session_policy() {
@@ -664,11 +662,15 @@ PY
 		git config --global url."${gh_https_url}github.com/".insteadOf git@github.com:
 
 		gum spin --spinner globe --title "正在安装 OpenClaw..." -- npm install -g openclaw@latest
+		hash -r 2>/dev/null || true
+		# 确保 npm 全局 bin 目录在 PATH 中
+		local npm_prefix
+		npm_prefix=$(npm prefix -g 2>/dev/null)
+		[[ -n "$npm_prefix" ]] && export PATH="$npm_prefix/bin:$PATH"
 		openclaw onboard --install-daemon
 		sed -i 's|"profile": "messaging"|"profile": "full"|g' ~/.openclaw/openclaw.json
 		configure_openclaw_session_policy
 		start_gateway
-		add_app_id
 	}
 
 	install_moltbot() {
@@ -2784,7 +2786,6 @@ EOF
 		crontab -l 2>/dev/null | grep -v "s gateway" | crontab -
 		start_gateway
 		hash -r
-		add_app_id
 		ui_ok "更新完成"
 		break_end
 	}
@@ -2795,9 +2796,8 @@ EOF
 		gum spin --spinner meter --title "正在卸载 OpenClaw..." -- openclaw uninstall
 		npm uninstall -g openclaw
 		crontab -l 2>/dev/null | grep -v "s gateway" | crontab -
-		rm -rf /root/.openclaw
+		rm -rf /root/.openclaw ~/.openclaw
 		hash -r
-		sed -i "/\b${app_id}\b/d" /home/docker/appno.txt
 
 		rm -f "$HOME/.local/bin/oc" "$HOME/.local/bin/openclawctl.sh" /usr/local/bin/oc
 		for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
