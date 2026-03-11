@@ -81,6 +81,37 @@ install() {
 }
 fi
 
+install_base_deps() {
+	local pkgs_apt="curl git nano jq python3 tar gnupg ca-certificates"
+	local pkgs_dnf="curl git nano jq python3 tar gnupg2 ca-certificates"
+	local pkgs_apk="curl git nano jq python3 tar gnupg ca-certificates"
+	local pkgs_pacman="curl git nano jq python tar gnupg ca-certificates"
+	local pkgs_zypper="curl git nano jq python3 tar gpg2 ca-certificates"
+
+	if command -v apt &>/dev/null; then
+		apt update -y -qq 2>/dev/null
+		# shellcheck disable=SC2086
+		apt install -y -qq $pkgs_apt 2>/dev/null
+	elif command -v dnf &>/dev/null; then
+		dnf install -y -q epel-release 2>/dev/null || true
+		# shellcheck disable=SC2086
+		dnf install -y -q $pkgs_dnf 2>/dev/null
+	elif command -v yum &>/dev/null; then
+		yum install -y -q epel-release 2>/dev/null || true
+		# shellcheck disable=SC2086
+		yum install -y -q $pkgs_dnf 2>/dev/null
+	elif command -v apk &>/dev/null; then
+		apk update -q 2>/dev/null
+		# shellcheck disable=SC2086
+		apk add -q $pkgs_apk 2>/dev/null
+	elif command -v pacman &>/dev/null; then
+		pacman -Sy --noconfirm --needed $pkgs_pacman 2>/dev/null
+	elif command -v zypper &>/dev/null; then
+		# shellcheck disable=SC2086
+		zypper install -y $pkgs_zypper 2>/dev/null
+	fi
+}
+
 _install_gum_binary() {
 	local arch
 	case "$(uname -m)" in
@@ -210,6 +241,7 @@ moltbot_menu() {
 
 	_install_shortcut
 
+	install_base_deps
 	install_gum || { echo "gum 安装失败，无法继续"; return 1; }
 	install_fzf || { echo "fzf 安装失败，无法继续"; return 1; }
 
