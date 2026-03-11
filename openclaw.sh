@@ -88,27 +88,29 @@ install_base_deps() {
 	local pkgs_pacman="curl git nano jq python tar gnupg ca-certificates"
 	local pkgs_zypper="curl git nano jq python3 tar gpg2 ca-certificates"
 
+	echo "正在准备运行环境..."
 	if command -v apt &>/dev/null; then
-		apt update -y -qq 2>/dev/null
+		apt update -y &>/dev/null
 		# shellcheck disable=SC2086
-		apt install -y -qq $pkgs_apt 2>/dev/null
+		DEBIAN_FRONTEND=noninteractive apt install -y $pkgs_apt &>/dev/null
 	elif command -v dnf &>/dev/null; then
-		dnf install -y -q epel-release 2>/dev/null || true
+		dnf install -y epel-release &>/dev/null || true
 		# shellcheck disable=SC2086
-		dnf install -y -q $pkgs_dnf 2>/dev/null
+		dnf install -y $pkgs_dnf &>/dev/null
 	elif command -v yum &>/dev/null; then
-		yum install -y -q epel-release 2>/dev/null || true
+		yum install -y epel-release &>/dev/null || true
 		# shellcheck disable=SC2086
-		yum install -y -q $pkgs_dnf 2>/dev/null
+		yum install -y $pkgs_dnf &>/dev/null
 	elif command -v apk &>/dev/null; then
-		apk update -q 2>/dev/null
+		apk update &>/dev/null
 		# shellcheck disable=SC2086
-		apk add -q $pkgs_apk 2>/dev/null
+		apk add $pkgs_apk &>/dev/null
 	elif command -v pacman &>/dev/null; then
-		pacman -Sy --noconfirm --needed $pkgs_pacman 2>/dev/null
+		# shellcheck disable=SC2086
+		pacman -Sy --noconfirm --needed $pkgs_pacman &>/dev/null
 	elif command -v zypper &>/dev/null; then
 		# shellcheck disable=SC2086
-		zypper install -y $pkgs_zypper 2>/dev/null
+		zypper install -y $pkgs_zypper &>/dev/null
 	fi
 }
 
